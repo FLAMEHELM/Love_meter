@@ -114,7 +114,7 @@ async def predict(messages: int, response_time: int, emojis: int, first_msg: int
         comment = "🧡 Теплые чувства!"
     else:
         comment = "💔 Нужно поработать над отношениями."
-    who = "Она любит тебя" if is_male == 1 else "Ты любишь её"
+    who = "Она любит тебя" if is_male == 1 else "Он любит тебя"
     return {"love_percent": pred, "message": f"{who} на {pred}%! {comment}"}
 
 if __name__ == "__main__":
