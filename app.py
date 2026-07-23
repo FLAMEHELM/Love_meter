@@ -85,11 +85,16 @@ app.add_middleware(
 )
 
 # Здесь вставь свой HTML (я его опускаю для краткости, ты его уже имеешь)
-HTML_PATH = "templates/index.html"
+HTML_PATH = os.path.join("templates", "index.html")
 
 @app.get("/", response_class=HTMLResponse)
 async def root():
-    return HTMLResponse(content=HTML_PATH)
+    # Проверяем, существует ли файл
+    if not os.path.exists(HTML_PATH):
+        return HTMLResponse(content="<h1>Ошибка: файл templates/index.html не найден</h1>", status_code=404)
+    with open(HTML_PATH, "r", encoding="utf-8") as f:
+        html_content = f.read()
+    return HTMLResponse(content=html_content)
 
 @app.get("/predict")
 async def predict(messages: int, response_time: int, emojis: int, first_msg: int, positive_ratio: float, is_male: int):
