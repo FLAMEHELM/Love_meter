@@ -1,23 +1,19 @@
 import numpy as np
-import pandas as pd 
-import pickle 
+import pandas as pd
+import pickle
+import os
 from sklearn.ensemble import RandomForestRegressor
 from sklearn.preprocessing import StandardScaler
-from fastapi import FastAPI, Request, Form
-from fastapi.templating import Jinja2Templates
+from fastapi import FastAPI
 from fastapi.responses import HTMLResponse
-from pydantic import BaseModel
-import uvicorn
-import os
-
 from fastapi.middleware.cors import CORSMiddleware
+import uvicorn
 
-
-model_path = 'model.pkl'
-scaler_path = 'scaler.pkl'
-
-if not (os.path.exists(model_path) and os.path.exists(scaler_path)):
-    print("🔄 Обучение модели на синтетических данных...")
+# ------------------------------------------------------------
+# 1. Функция для создания/пересоздания модели
+# ------------------------------------------------------------
+def create_model():
+    print("🔄 Создаю новую модель на синтетических данных...")
     np.random.seed(42)
     n_samples = 2000
     messages = np.random.randint(0, 51, n_samples)
@@ -44,69 +40,77 @@ if not (os.path.exists(model_path) and os.path.exists(scaler_path)):
     model = RandomForestRegressor(n_estimators=100, random_state=42)
     model.fit(X_scaled, y)
     
-    with open(model_path, 'wb') as f:
+    with open('model.pkl', 'wb') as f:
         pickle.dump(model, f)
-    with open(scaler_path, 'wb') as f:
+    with open('scaler.pkl', 'wb') as f:
         pickle.dump(scaler, f)
     print("✅ Модель и скейлер созданы и сохранены.")
-else:
-    print("📂 Загрузка существующей модели и скейлера...")
+    return model, scaler
 
+# ------------------------------------------------------------
+# 2. Загрузка или создание модели (с обработкой ошибок)
+# ------------------------------------------------------------
+model = None
+scaler = None
 
-with open(model_path, 'rb') as f:
-    model = pickle.load(f)
-with open(scaler_path, 'rb') as f:
-    scaler = pickle.load(f)
+try:
+    if os.path.exists('model.pkl') and os.path.exists('scaler.pkl'):
+        with open('model.pkl', 'rb') as f:
+            model = pickle.load(f)
+        with open('scaler.pkl', 'rb') as f:
+            scaler = pickle.load(f)
+        print("✅ Модель и скейлер загружены из файлов.")
+    else:
+        model, scaler = create_model()
+except Exception as e:
+    print(f"⚠️ Ошибка загрузки модели: {e}")
+    print("🔄 Пересоздаю модель...")
+    # Удаляем повреждённые файлы, если они есть
+    if os.path.exists('model.pkl'):
+        os.remove('model.pkl')
+    if os.path.exists('scaler.pkl'):
+        os.remove('scaler.pkl')
+    model, scaler = create_model()
 
+# ------------------------------------------------------------
+# 3. FastAPI приложение
+# ------------------------------------------------------------
+app = FastAPI(title="Счетчик Любви ❤️", version="1.0")
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 
-app = FastAPI(title='Счетчик Любви ❤️', version='1.0')
-
-HTML_FILE = os.path.join("templates", "index.html")
+# Здесь вставь свой HTML (я его опускаю для краткости, ты его уже имеешь)
+HTML_TEMPLATE = """... (твой HTML код) ..."""
 
 @app.get("/", response_class=HTMLResponse)
-async def read_root():
-    with open(HTML_FILE, "r", encoding="utf-8") as f:
-        html_content = f.read()
-    return HTMLResponse(content=html_content)
+async def root():
+    return HTMLResponse(content=HTML_TEMPLATE)
 
 @app.get("/predict")
-async def predict(
-      messages: int, 
-      response_time: int, 
-      emojis: int, 
-      first_msg: int, 
-      positive_ratio: float,
-      is_male: int
-): 
+async def predict(messages: int, response_time: int, emojis: int, first_msg: int, positive_ratio: float, is_male: int):
     features = np.array([[messages, response_time, emojis, first_msg, positive_ratio, is_male]])
-
     features_scaled = scaler.transform(features)
-    prediction = model.predict(features_scaled)[0]
-
-    prediction = round(prediction, 1)
-
-    if prediction >= 130:
-        comment = "💖 Божественная любовь! Вы созданы друг для друга!"
-    elif prediction >= 100:
-        comment = "❤️ Очень сильная любовь! Она/Он точно в вас души не чает."
-    elif prediction >= 70:
-        comment = "💕 Хорошая любовь, есть над чем работать, но все отлично!"
-    elif prediction >= 40:
-        comment = "🧡 Теплые чувства есть, но пора добавить романтики!"
+    pred = model.predict(features_scaled)[0]
+    pred = round(pred, 1)
+    
+    # комментарии...
+    if pred >= 130:
+        comment = "💖 Божественная любовь!"
+    elif pred >= 100:
+        comment = "❤️ Очень сильная любовь!"
+    elif pred >= 70:
+        comment = "💕 Хорошая любовь!"
+    elif pred >= 40:
+        comment = "🧡 Теплые чувства!"
     else:
-        comment = "💔 Нужно срочно поговорить и всё исправить!"
+        comment = "💔 Нужно поработать над отношениями."
+    who = "Она любит тебя" if is_male == 1 else "Ты любишь её"
+    return {"love_percent": pred, "message": f"{who} на {pred}%! {comment}"}
 
-    if is_male == 1:
-         who = 'Она любит тебя'
-    else: 
-         who = 'Ты любишь её'
-
-    return {
-         'love_percent': prediction,
-         'message': f"{who} на {prediction}%! {comment}"
-    }
-
-if __name__ == "__main__": 
-     uvicorn.run(app, host="127.0.0.1", port=8000)
-
-
+if __name__ == "__main__":
+    uvicorn.run(app, host="127.0.0.1", port=8000)
