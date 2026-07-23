@@ -85,11 +85,11 @@ app.add_middleware(
 )
 
 # Здесь вставь свой HTML (я его опускаю для краткости, ты его уже имеешь)
-HTML_TEMPLATE = """... (твой HTML код) ..."""
+HTML_PATH = "templates/index.html"
 
 @app.get("/", response_class=HTMLResponse)
 async def root():
-    return HTMLResponse(content=HTML_TEMPLATE)
+    return HTMLResponse(content=HTML_PATH)
 
 @app.get("/predict")
 async def predict(messages: int, response_time: int, emojis: int, first_msg: int, positive_ratio: float, is_male: int):
